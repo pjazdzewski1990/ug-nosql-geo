@@ -21,16 +21,6 @@
                         <span class="icon-bar"></span>
                         <span class="icon-bar"></span>
                     </a>
-                    <g:link class="brand" uri="/">Address Tracker</g:link>
-                    <div class="nav-collapse">
-                        <ul class="nav pull-right">
-                            <sec:ifLoggedIn>
-                            <li>
-                                <g:link controller="logout" action="index">Logout</g:link>
-                            </li>
-                            </sec:ifLoggedIn>
-                        </ul>
-                    </div>
                 </div>
             </div>
         </div>
