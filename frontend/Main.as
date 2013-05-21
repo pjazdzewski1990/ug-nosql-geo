@@ -14,6 +14,8 @@
 	import flash.net.URLRequestHeader;
 	import com.adobe.serialization.json.JSON;
 	import com.adobe.serialization.json.JSONEncoder;
+	import flash.events.KeyboardEvent;
+	import flash.ui.Keyboard;
 
 	
 
@@ -28,7 +30,7 @@
 
 		private var dataArr:*;
 		private var lvlArr:Array;
-		private var lvlCounter:int = 0;
+		private var lvlCounter:int = 1;
 		
 		public var hover:Sprite;
 		public var w:int;
@@ -40,10 +42,13 @@
 		private var mapPosX:int;
 		private var mapPosY:int;
 
+		private var scale_:Number = 0;
+
 		private var mouseD:Boolean;
 		private var nodeContainer:Sprite;
 		private var scaleS:Number;
 		private var url = "http://127.0.0.1/dummy_json/index.php";
+		private var header:URLRequestHeader = new URLRequestHeader("pragma", "no-cache");
 		private var drawArr;
 		private var urlReq;//= new URLRequest("http://127.0.0.1/dummy_json/index.php?zoom_lvl=1");
 		private var urlLoader;
@@ -72,7 +77,7 @@
 		
 		public function setup() {
 			//request GET /geo/country/1
-			
+			redrawM = true;
 			drawHover();
 			drawMap();
 
@@ -80,9 +85,9 @@
 		}
 		
 		private function requestHandler(e:Event) {
+			dataArr = null;
 			dataArr=com.adobe.serialization.json.JSON.decode(e.target.data);
 			//drawArr = new Array(test.border);
-			trace(dataArr.border[0].x);
 			
 			
 			loc_btn.label = dataArr.name;
@@ -101,16 +106,24 @@
 			this.w = w;
 			this.h = h;
 			
-			 var header:URLRequestHeader = new URLRequestHeader("pragma", "no-cache");
+			 
 			
+			makeRequest();
 			
-			urlReq = new URLRequest(url + "?zoom_lvl=1&b=1");
+		}
+
+		private function makeRequest() {
+			trace("req");
+			urlLoader = null;
+			urlReq = null;
+			trace(url + "?zoom_lvl=" +lvlCounter+"&b=" + Math.random()*100000);
+			urlReq = new URLRequest(url + "?zoom_lvl=" +lvlCounter+"&b=" + Math.random()*100000);
 			urlReq.requestHeaders.push(header);
 			urlLoader = new URLLoader();
 			urlLoader.addEventListener(Event.COMPLETE, requestHandler);
 			urlLoader.load(urlReq);
+			
 		}
-
 
 
 		public function drawHover()
@@ -124,6 +137,51 @@
 
 		}
 
+		private function findSmallest():Array{
+			
+			var ret:Array = new Array();
+			var px:int =dataArr.border[0].x;
+			var py:int =dataArr.border[0].y;
+				
+			var minX:int = px;
+			var maxX:int = px;
+			var minY:int = py;
+			var maxY:int = py;
+			
+			for (var i:int=1; i<dataArr.border.length; i++)
+					{
+						px =dataArr.border[i].x;
+			 			py =dataArr.border[i].y;
+						
+						if(px<minX) {
+							minX = px;
+						} else if(px>maxX) {
+							maxX = px;
+						}
+						
+						if(py<minY) {
+							minY = py;
+						} else if(py>maxY) {
+							maxY = py;
+						}
+						
+					}
+					
+					
+				var scale_X:Number = w*0.92/(maxX - minX);
+				var scale_Y:Number = h*0.92/(maxY - minY);
+				var scale_:Number = 0;
+				if(scale_X<scale_Y) {
+					scale_ = scale_Y;
+				} else {
+					scale_ = scale_X;
+					}				
+							ret.push(scale_);
+							ret.push(minX);
+							ret.push(minY);
+			return ret;
+		}
+		
 		public function drawMap()
 		{
 			if (redrawM)
@@ -135,41 +193,46 @@
 
 				var px:int = 0;
 				var py:int = 0;
+				var vector:Array = findSmallest();
+				scale_ = vector[0];
+				
+				trace(scale_);
 
-				px =dataArr.border[0].x;
-				py =dataArr.border[0].y;
+				px =(dataArr.border[0].x - vector[1] +1)*scale_;
+				py =(dataArr.border[0].y- vector[2] +1)*scale_;
 
 				mapContainer.graphics.moveTo(px,py);
 				mapContainer.graphics.lineStyle(3,0x00ff00);
+				
+				
 
 					nodeContainer = new Sprite();
 					for (var i:int=1; i<dataArr.border.length; i++)
 					{
 						
-						
-						px =dataArr.border[i].x;
-						py =dataArr.border[i].y;
+						px =(dataArr.border[i].x- vector[1]+1) * scale_;
+						py =(dataArr.border[i].y- vector[2]+1) * scale_;
 						mapContainer.graphics.lineTo(px,py);///scaleS,py/scaleS);
 						mapContainer.graphics.moveTo(px,py);//scaleS,py/scaleS);
+						
+						
 	
 					}
-					px =dataArr.border[0].x;
-					py =dataArr.border[0].y;
+					px =(dataArr.border[0].x - vector[1]+1)*scale_;
+					py =(dataArr.border[0].y - vector[2]+1)*scale_;
 					mapContainer.graphics.lineTo(px,py);///scaleS,py/scaleS);
 					mapContainer.graphics.moveTo(px,py);///scaleS,py/scaleS);
 
 
-				
-
-
-				var bitmap:BitmapData = new BitmapData(2000, 2000);
+				var bitmap:BitmapData = new BitmapData(w, h);
 				bitmap.draw(mapContainer);
 				
 				mapContainer = null;
 				mapContainer = new Sprite();
+				mapContainer.addEventListener(MouseEvent.CLICK, mapHandler);
 				mapContainer.addChild(new Bitmap(bitmap));
 				this.addChild(mapContainer);
-				this.setChildIndex(mapContainer,0);
+				//this.setChildIndex(mapContainer,0);
 				this.setChildIndex(loc_btn,numChildren-1);
 				this.setChildIndex(back_btn,numChildren-1);
 				
@@ -178,14 +241,24 @@
 
 
 		}
+		
+		private function mapHandler(e:MouseEvent) {
+			
+			trace(int(e.localX+scale_));
+			lvlCounter+=1;
+			makeRequest();
+			
+		}
 
 		public function setListeners()
 		{
 
-			this.addEventListener(MouseEvent.CLICK, mouseHandler);
-			this.addEventListener(MouseEvent.MOUSE_DOWN, mouseHandler);
+			//this.addEventListener(MouseEvent.CLICK, mouseHandler);
+			//this.addEventListener(MouseEvent.RIGHT_MOUSE_DOWN, mouseHandler);
 			//this.addEventListener(MouseEvent.MOUSE_WHEEL, mouseHandler);
-			this.addEventListener(MouseEvent.MOUSE_UP, mouseHandler);
+			//stage.addEventListener(MouseEvent.MIDDLE_MOUSE_DOWN, mouseHandler);
+			//stage.addEventListener(MouseEvent.MIDDLE_MOUSE_UP, mouseHandler);
+			stage.addEventListener(KeyboardEvent.KEY_DOWN, keyboardHandler);
 			this.addEventListener(MouseEvent.ROLL_OUT, mouseHandler);
 
 			this.addEventListener(Event.ENTER_FRAME, frameHandler);
@@ -195,11 +268,39 @@
 
 		}
 		
+		private function keyboardHandler(e:KeyboardEvent) {
+			trace(e.keyCode);
+			switch(e.keyCode) {
+				case 37:
+					mapContainer.x-=5;
+				break;
+				
+				case 38:
+					mapContainer.y-=5;
+				break;
+				
+				case 39:
+					mapContainer.x+=5;
+				break;
+				
+				case 40:
+					mapContainer.y+=5;
+				break;
+				
+				
+				
+			}
+			
+		}
+		
 		private function buttonHandler(e:MouseEvent) {
 			trace("aaaa");
 			switch(e.target) {
 				
-				
+				case back_btn:
+					lvlCounter=1;
+					makeRequest();
+				break;
 				
 				
 			}
@@ -233,7 +334,7 @@
 
 		public function mouseHandler(e:MouseEvent)
 		{
-
+			trace(e.type);
 			switch (e.type)
 			{
 				case "mouseWheel" :
@@ -259,13 +360,13 @@
 					mouseD = false;
 
 					break;
-				case "mouseDown" :
+				case "middleMouseDown" :
 					lastMX = mouseX;
 					lastMY = mouseY;
 					mouseD = true;
 					break;
 
-				case "mouseUp" :
+				case "middleMouseUp" :
 					mouseD = false;
 
 					trace(this.mapContainer.x);
