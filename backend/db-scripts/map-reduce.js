@@ -15,7 +15,11 @@ Array.prototype.compare = function(b) {
 //map reduce dla przypisania do powiatow
 var map = function() {
 	//oddaj id powiatu i punkty graniczne gminy 
-	emit(this.powiat_id, [1,2,3]);
+	var locations = [];
+	for(var i=0; i<this.loc.length){
+		locations.concat(this.loc[i]);
+	}
+	emit(this.powiat_id, locations);
 };
 var reduce = function(key, val) {
 	//paczuejmy array
